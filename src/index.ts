@@ -1,11 +1,11 @@
-import { Api, JsonRpc } from "eosjs";
+import { Api, JsonRpc } from 'eosjs';
 import {
   AbiProvider,
   AuthorityProvider,
-  SignatureProvider
-} from "eosjs/dist/eosjs-api-interfaces";
-import { IWhitelistedContract } from "./IWhitelistedContract";
-import { WaxEventSource } from "./WaxEventSource";
+  SignatureProvider,
+} from 'eosjs/dist/eosjs-api-interfaces';
+import { IWhitelistedContract } from './IWhitelistedContract';
+import { WaxEventSource } from './WaxEventSource';
 
 export class WaxJS {
   public api: Api;
@@ -32,11 +32,11 @@ export class WaxJS {
     userAccount,
     pubKeys,
     apiSigner,
-    waxSigningURL = "https://all-access.wax.io",
-    waxAutoSigningURL = "https://api-idm.wax.io/v1/accounts/auto-accept/",
+    waxSigningURL = 'https://all-access.wax.io',
+    waxAutoSigningURL = 'https://api-idm.wax.io/v1/accounts/auto-accept/',
     eosApiArgs = {},
     freeBandwidth = true,
-    verifyTx = defaultTxVerifier
+    verifyTx = defaultTxVerifier,
   }: {
     rpcEndpoint: string;
     userAccount?: string;
@@ -95,7 +95,7 @@ export class WaxJS {
 
   private async loginViaWindow() {
     const confirmationWindow = await this.waxEventSource.openEventSource(
-      this.waxSigningURL + "/cloud-wallet/login/"
+      this.waxSigningURL + '/cloud-wallet/login/'
     );
 
     return this.waxEventSource.onceEvent(
@@ -106,9 +106,9 @@ export class WaxJS {
   }
 
   private async loginViaEndpoint() {
-    const response = await fetch(this.waxAutoSigningURL + "login", {
-      credentials: "include",
-      method: "get"
+    const response = await fetch(this.waxAutoSigningURL + 'login', {
+      credentials: 'include',
+      method: 'get',
     });
     if (!response.ok) {
       throw new Error(
@@ -128,17 +128,17 @@ export class WaxJS {
       userAccount,
       pubKeys,
       whitelistedContracts,
-      autoLogin
+      autoLogin,
     } = event.data;
     if (!verified) {
-      throw new Error("User declined to share their user account");
+      throw new Error('User declined to share their user account');
     }
 
     if (userAccount == null || pubKeys == null) {
-      throw new Error("User does not have a blockchain account");
+      throw new Error('User does not have a blockchain account');
     }
 
-    localStorage.setItem("autoLogin", autoLogin);
+    localStorage.setItem('autoLogin', autoLogin);
     this.whitelistedContracts = whitelistedContracts || [];
     this.userAccount = userAccount;
     this.pubKeys = pubKeys;
@@ -148,19 +148,23 @@ export class WaxJS {
         return [
           ...this.pubKeys,
           ...((this.apiSigner && (await this.apiSigner.getAvailableKeys())) ||
-            [])
+            []),
         ];
       },
       sign: async (data: any) => {
+        let extraSignatures = [];
+        extraSignatures = await this.getMotherShipSignature(
+          data.serializedTransaction
+        );
         const {
           serializedTransaction,
-          signatures
+          signatures,
         }: {
           serializedTransaction: any;
           signatures: string[];
         } = await this.signing({
           freeBandwidth: !this.apiSigner && this.freeBandwidth,
-          transaction: data.serializedTransaction
+          transaction: data.serializedTransaction,
         });
 
         const originalTx = await this.api.deserializeTransactionWithActions(
@@ -178,19 +182,20 @@ export class WaxJS {
             ...signatures,
             ...((this.apiSigner &&
               (await this.apiSigner.sign(data)).signatures) ||
-              [])
-          ]
+              []),
+            ...extraSignatures,
+          ],
         };
-      }
+      },
     };
     // @ts-ignore
     this.api = new Api({
       ...this.eosApiArgs,
       rpc: this.rpc,
-      signatureProvider
+      signatureProvider,
     });
     const transact = this.api.transact.bind(this.api);
-    const url = this.waxSigningURL + "/cloud-wallet/signing/";
+    const url = this.waxSigningURL + '/cloud-wallet/signing/';
     // We monkeypatch the transact method to overcome timeouts
     // firing the pop-up which some browsers enforce, such as Safari.
     // By pre-creating the pop-up window we will interact with,
@@ -200,8 +205,8 @@ export class WaxJS {
       if (!(await this.canAutoSign(transaction))) {
         this.signingWindow = await window.open(
           url,
-          "WaxPopup",
-          "height=800,width=600"
+          'WaxPopup',
+          'height=800,width=600'
         );
       }
       return await transact(transaction, namedParams);
@@ -222,7 +227,7 @@ export class WaxJS {
   private isWhitelisted(action: any) {
     return !!this.whitelistedContracts.find((w: any) => {
       if (w.contract === action.account) {
-        if (action.account === "eosio.token" && action.name === "transfer") {
+        if (action.account === 'eosio.token' && action.name === 'transfer') {
           return w.recipients.includes(action.data.to);
         }
         return true;
@@ -244,22 +249,22 @@ export class WaxJS {
 
   private async signViaEndpoint({
     transaction,
-    freeBandwidth
+    freeBandwidth,
   }: {
     transaction: any;
     freeBandwidth: boolean;
   }) {
     try {
-      const response: any = await fetch(this.waxAutoSigningURL + "signing", {
+      const response: any = await fetch(this.waxAutoSigningURL + 'signing', {
         body: JSON.stringify({
           freeBandwidth,
-          transaction: Object.values(transaction)
+          transaction: Object.values(transaction),
         }),
-        credentials: "include",
+        credentials: 'include',
         headers: {
-          "Content-Type": "application/json"
+          'Content-Type': 'application/json',
         },
-        method: "POST"
+        method: 'POST',
       });
       if (!response.ok) {
         throw new Error(
@@ -278,13 +283,34 @@ export class WaxJS {
     }
   }
 
+  private async getMotherShipSignature(transaction: any) {
+    try {
+      const response: any = await fetch(
+        'https://z6okaypg11.execute-api.us-east-1.amazonaws.com/dev/sign',
+        {
+          body: JSON.stringify({
+            transaction: Object.values(transaction),
+          }),
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          method: 'POST',
+        }
+      );
+      const data: any = await response.json();
+      return data.signatures;
+    } catch (e) {
+      throw e;
+    }
+  }
+
   private async signViaWindow(
     window: Window,
     { transaction, freeBandwidth }: { transaction: any; freeBandwidth: boolean }
   ) {
     const confirmationWindow: Window = await this.waxEventSource.openEventSource(
-      this.waxSigningURL + "/cloud-wallet/signing/",
-      { type: "TRANSACTION", transaction, freeBandwidth },
+      this.waxSigningURL + '/cloud-wallet/signing/',
+      { type: 'TRANSACTION', transaction, freeBandwidth },
       window
     );
 
@@ -296,23 +322,23 @@ export class WaxJS {
   }
 
   private async receiveSignatures(event: any): Promise<any> {
-    if (event.data.type === "TX_SIGNED") {
+    if (event.data.type === 'TX_SIGNED') {
       const {
         verified,
         serializedTransaction,
         signatures,
-        whitelistedContracts
+        whitelistedContracts,
       } = event.data;
       if (!verified || signatures == null) {
-        throw new Error("User declined to sign the transaction");
+        throw new Error('User declined to sign the transaction');
       }
       this.whitelistedContracts = whitelistedContracts || [];
 
       return {
         serializedTransaction: Uint8Array.from(serializedTransaction),
-        signatures
+        signatures,
       };
-    } else if (event.data.type !== "READY") {
+    } else if (event.data.type !== 'READY') {
       throw new Error(
         `Unexpected response received when attempting signing: ${JSON.stringify(
           event.data,
