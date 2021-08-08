@@ -1,5 +1,5 @@
 export class WaxEventSource {
-  constructor(private waxSigningURL: string = "http://localhost:3000") {
+  constructor(private waxSigningURL: string = 'http://localhost:3000') {
     this.openEventSource = this.openEventSource.bind(this);
     this.onceEvent = this.onceEvent.bind(this);
   }
@@ -11,18 +11,22 @@ export class WaxEventSource {
   ): Promise<any> {
     const openedWindow = win
       ? win
-      : await window.open(url, "WaxPopup", "height=800,width=600");
+      : await window.open(
+          url,
+          message.sessionToken ? message.sessionToken : 'WaxPoup',
+          'height=800,width=600'
+        );
 
     if (!openedWindow) {
-      throw new Error("Unable to open a popup window");
+      throw new Error('Unable to open a popup window');
     }
 
-    if (typeof message === "undefined") {
+    if (typeof message === 'undefined') {
       return openedWindow;
     }
 
     const postTransaction = async (event: any) => {
-      if (event.data.type === "READY") {
+      if (event.data.type === 'READY') {
         // @ts-ignore
         openedWindow.postMessage(message, this.waxSigningURL);
       }
@@ -35,8 +39,8 @@ export class WaxEventSource {
       postTransaction
     );
 
-    await Promise.race([eventPromise, this.timeout()]).catch(err => {
-      if (err.message !== "Timeout") {
+    await Promise.race([eventPromise, this.timeout()]).catch((err) => {
+      if (err.message !== 'Timeout') {
         throw err;
       }
 
@@ -53,7 +57,7 @@ export class WaxEventSource {
   ) {
     return new Promise((resolve, reject) => {
       (window as Window).addEventListener(
-        "message",
+        'message',
         async function onEvent(event) {
           // Validate expected origin for event
           if (event.origin !== origin) {
@@ -65,7 +69,7 @@ export class WaxEventSource {
             return;
           }
 
-          if (typeof event.data !== "object") {
+          if (typeof event.data !== 'object') {
             return;
           }
 
@@ -76,7 +80,7 @@ export class WaxEventSource {
             reject(e);
           }
 
-          (window as Window).removeEventListener("message", onEvent, false);
+          (window as Window).removeEventListener('message', onEvent, false);
         },
         false
       );
@@ -87,7 +91,7 @@ export class WaxEventSource {
     return new Promise((resolve, reject) => {
       const wait = setTimeout(() => {
         clearTimeout(wait);
-        reject(new Error("Timeout"));
+        reject(new Error('Timeout'));
       }, 2000);
     });
   };

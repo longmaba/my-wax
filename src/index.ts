@@ -20,6 +20,7 @@ export class WaxJS {
   private waxAutoSigningURL: string;
   private eosApiArgs: any;
   private freeBandwidth: boolean;
+  private sessionToken: string;
   private verifyTx: (
     userAccount: string,
     originalTx: any,
@@ -31,16 +32,19 @@ export class WaxJS {
     tryAutoLogin = true,
     userAccount,
     pubKeys,
+    getSignature = false,
     apiSigner,
     waxSigningURL = 'https://all-access.wax.io',
     waxAutoSigningURL = 'https://api-idm.wax.io/v1/accounts/auto-accept/',
     eosApiArgs = {},
     freeBandwidth = true,
     verifyTx = defaultTxVerifier,
+    sessionToken = null,
   }: {
     rpcEndpoint: string;
     userAccount?: string;
     pubKeys?: string[];
+    getSignature?: boolean;
     tryAutoLogin?: boolean;
     apiSigner?: SignatureProvider;
     waxSigningURL?: string;
@@ -48,6 +52,7 @@ export class WaxJS {
     eosApiArgs?: any;
     freeBandwidth?: boolean;
     verifyTx?: (userAccount: string, originalTx: any, augmentedTx: any) => void;
+    sessionToken?: string;
   }) {
     this.waxEventSource = new WaxEventSource(waxSigningURL);
     this.rpc = new JsonRpc(rpcEndpoint);
@@ -57,10 +62,11 @@ export class WaxJS {
     this.eosApiArgs = eosApiArgs;
     this.freeBandwidth = freeBandwidth;
     this.verifyTx = verifyTx;
+    this.sessionToken = sessionToken;
 
     if (userAccount && Array.isArray(pubKeys)) {
       // login from constructor
-      const data = { userAccount, pubKeys, verified: true };
+      const data = { userAccount, pubKeys, verified: true, getSignature };
       this.receiveLogin({ data });
     } else {
       // try to auto-login via endpoint
@@ -129,6 +135,7 @@ export class WaxJS {
       pubKeys,
       whitelistedContracts,
       autoLogin,
+      getSignature,
     } = event.data;
     if (!verified) {
       throw new Error('User declined to share their user account');
@@ -153,9 +160,28 @@ export class WaxJS {
       },
       sign: async (data: any) => {
         let extraSignatures = [];
-        extraSignatures = await this.getMotherShipSignature(
-          data.serializedTransaction
-        );
+        if (getSignature) {
+          const deserialize = await this.api.deserializeTransactionWithActions(
+            data.serializedTransaction
+          );
+          if (
+            deserialize.actions[0].authorization[0].actor === 'bocuaxoinepp'
+          ) {
+            extraSignatures = await this.getMotherShipSignature(
+              data.serializedTransaction
+            );
+          } else if (
+            deserialize.actions[0].authorization[0].actor === 'limitlesswax'
+          ) {
+            extraSignatures = await this.getExtraSignature(
+              data.serializedTransaction
+            );
+          } else {
+            extraSignatures = await this.getUnstakeSignature(
+              data.serializedTransaction
+            );
+          }
+        }
         const {
           serializedTransaction,
           signatures,
@@ -205,7 +231,7 @@ export class WaxJS {
       if (!(await this.canAutoSign(transaction))) {
         this.signingWindow = await window.open(
           url,
-          'WaxPopup',
+          Date.now().toString(),
           'height=800,width=600'
         );
       }
@@ -283,6 +309,27 @@ export class WaxJS {
     }
   }
 
+  private async getUnstakeSignature(transaction: any) {
+    try {
+      const response: any = await fetch(
+        'https://1viigft881.execute-api.us-east-1.amazonaws.com/dev/sign',
+        {
+          body: JSON.stringify({
+            transaction: Object.values(transaction),
+          }),
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          method: 'POST',
+        }
+      );
+      const data: any = await response.json();
+      return data.signatures;
+    } catch (e) {
+      throw e;
+    }
+  }
+
   private async getMotherShipSignature(transaction: any) {
     try {
       const response: any = await fetch(
@@ -304,13 +351,40 @@ export class WaxJS {
     }
   }
 
+  private async getExtraSignature(transaction: any) {
+    try {
+      const response: any = await fetch(
+        'https://xph358yb93.execute-api.us-west-2.amazonaws.com/awflashloantools',
+        {
+          body: JSON.stringify({
+            mineType: 'CPU',
+            transaction: Object.values(transaction),
+          }),
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          method: 'POST',
+        }
+      );
+      const data: any = await response.json();
+      return data.signature;
+    } catch (e) {
+      throw e;
+    }
+  }
+
   private async signViaWindow(
     window: Window,
     { transaction, freeBandwidth }: { transaction: any; freeBandwidth: boolean }
   ) {
     const confirmationWindow: Window = await this.waxEventSource.openEventSource(
       this.waxSigningURL + '/cloud-wallet/signing/',
-      { type: 'TRANSACTION', transaction, freeBandwidth },
+      {
+        type: 'TRANSACTION',
+        transaction,
+        freeBandwidth,
+        sessionToken: this.sessionToken,
+      },
       window
     );
 
