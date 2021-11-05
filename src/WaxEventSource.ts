@@ -1,7 +1,18 @@
 export class WaxEventSource {
-  constructor(private waxSigningURL: string = 'http://localhost:3000') {
+  constructor(private waxSigningURL: string) {
     this.openEventSource = this.openEventSource.bind(this);
     this.onceEvent = this.onceEvent.bind(this);
+  }
+
+  public async openPopup(url: string,
+    message?: any ): Promise<Window> {
+    const win = await window.open(url, message, "height=800,width=600");
+
+    if (win) {
+      return win;
+    }
+
+    throw new Error("Unable to open popup window");
   }
 
   public async openEventSource(
@@ -11,22 +22,18 @@ export class WaxEventSource {
   ): Promise<any> {
     const openedWindow = win
       ? win
-      : await window.open(
-          url,
-          message.sessionToken ? message.sessionToken : 'WaxPoup',
-          'height=800,width=600'
-        );
+      : await this.openPopup(url, message.sessionToken ? message.sessionToken : 'WaxPoup');
 
     if (!openedWindow) {
-      throw new Error('Unable to open a popup window');
+      throw new Error("Unable to open a popup window");
     }
 
-    if (typeof message === 'undefined') {
+    if (typeof message === "undefined") {
       return openedWindow;
     }
 
     const postTransaction = async (event: any) => {
-      if (event.data.type === 'READY') {
+      if (event.data.type === "READY") {
         // @ts-ignore
         openedWindow.postMessage(message, this.waxSigningURL);
       }
@@ -39,8 +46,8 @@ export class WaxEventSource {
       postTransaction
     );
 
-    await Promise.race([eventPromise, this.timeout()]).catch((err) => {
-      if (err.message !== 'Timeout') {
+    await Promise.race([eventPromise, this.timeout()]).catch(err => {
+      if (err.message !== "Timeout") {
         throw err;
       }
 
@@ -50,37 +57,39 @@ export class WaxEventSource {
     return openedWindow;
   }
 
-  public async onceEvent(
+  public async onceEvent<T>(
     source: Window,
     origin: string,
-    action: (e: any) => void
-  ) {
+    action: (e: MessageEvent) => T,
+    type?: string
+  ): Promise<T> {
     return new Promise((resolve, reject) => {
-      (window as Window).addEventListener(
-        'message',
+      window.addEventListener(
+        "message",
         async function onEvent(event) {
-          // Validate expected origin for event
           if (event.origin !== origin) {
             return;
           }
 
-          // Validate expected source for event
           if (event.source !== source) {
             return;
           }
 
-          if (typeof event.data !== 'object') {
+          if (typeof event.data !== "object") {
+            return;
+          }
+
+          if (type && (!event.data.type || event.data.type !== type)) {
             return;
           }
 
           try {
-            const result: any = await action(event);
-            resolve(result);
+            resolve(await action(event));
           } catch (e) {
             reject(e);
           }
 
-          (window as Window).removeEventListener('message', onEvent, false);
+          window.removeEventListener("message", onEvent, false);
         },
         false
       );
@@ -91,8 +100,8 @@ export class WaxEventSource {
     return new Promise((resolve, reject) => {
       const wait = setTimeout(() => {
         clearTimeout(wait);
-        reject(new Error('Timeout'));
-      }, 2000);
+        reject(new Error("Timeout"));
+      }, 5000);
     });
   };
 }
