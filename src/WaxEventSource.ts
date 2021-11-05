@@ -79,10 +79,6 @@ export class WaxEventSource {
             return;
           }
 
-          if (type && (!event.data.type || event.data.type !== type)) {
-            return;
-          }
-
           try {
             resolve(await action(event));
           } catch (e) {
