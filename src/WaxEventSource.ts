@@ -43,7 +43,8 @@ export class WaxEventSource {
       // @ts-ignore
       openedWindow,
       this.waxSigningURL,
-      postTransaction
+      postTransaction,
+      "READY"
     );
 
     await Promise.race([eventPromise, this.timeout()]).catch(err => {
@@ -76,6 +77,10 @@ export class WaxEventSource {
           }
 
           if (typeof event.data !== "object") {
+            return;
+          }
+
+          if (type && (!event.data.type || event.data.type !== type)) {
             return;
           }
 
