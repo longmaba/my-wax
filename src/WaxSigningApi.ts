@@ -172,8 +172,7 @@ export class WaxSigningApi {
     return this.waxEventSource.onceEvent(
       confirmationWindow,
       this.waxSigningURL,
-      this.receiveSignatures.bind(this),
-      "TX_SIGNED"
+      this.receiveSignatures.bind(this)
     );
   }
 
