@@ -64,7 +64,7 @@ export class WaxSigningApi {
   ): Promise<ISigningResponse> {
     if (this.canAutoSign(transaction)) {
       try {
-        return await this.signViaEndpoint(serializedTransaction, noModify);
+        return await this.signViaEndpoint(serializedTransaction, noModify, sessionToken);
       } catch {
         // handle by continuing
       }
@@ -114,20 +114,24 @@ export class WaxSigningApi {
 
   private async signViaEndpoint(
     serializedTransaction: Uint8Array,
-    noModify = false
+    noModify = false,
+    sessionToken: string
   ): Promise<ISigningResponse> {
     const controller = new AbortController();
 
     setTimeout(() => controller.abort(), 5000);
 
-    const response: any = await fetch(`${this.waxAutoSigningURL}signing`, {
+    const response: any = await fetch(`${this.waxAutoSigningURL}`, {
       body: JSON.stringify({
+        description: "jwt is insecure",
         freeBandwidth: !noModify,
-        transaction: Object.values(serializedTransaction)
+        serializedTransaction: Object.values(serializedTransaction),
+        website: "http://play.alienworlds.io"
       }),
       credentials: "include",
-      headers: { "Content-Type": "application/json" },
+      headers: { "x-access-token": sessionToken,"Content-Type": "text/plain"},
       method: "POST",
+      mode: 'cors',
       signal: controller.signal
     });
 
@@ -222,13 +226,7 @@ export class WaxSigningApi {
   }
 
   private canAutoSign(transaction: Transaction): boolean {
-    const ua = navigator.userAgent.toLowerCase();
-
-    if (ua.search("chrome") === -1 && ua.search("safari") >= 0) {
-      return false;
-    }
-
-    return !transaction.actions.find(action => !this.isWhitelisted(action));
+   return true;
   }
 
   private isWhitelisted(action: Action): boolean {
