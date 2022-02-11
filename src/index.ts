@@ -112,7 +112,6 @@ export class WaxJS {
     return false;
   }
 
-  
   private receiveLogin(data: ILoginResponse): void {
     this.user = data;
 

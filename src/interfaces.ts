@@ -3,12 +3,12 @@ export interface IWhitelistedContract {
     domain: string;
     recipients: string[];
   }
-  
+
   export interface ISigningResponse {
     serializedTransaction: Uint8Array;
     signatures: string[];
   }
-  
+
   export interface ILoginResponse {
     account: string;
     keys: string[];
