@@ -3,7 +3,7 @@ import { Action } from "eosjs/dist/eosjs-serialize";
 import {
   ILoginResponse,
   ISigningResponse,
-  IWhitelistedContract
+  IWhitelistedContract,
 } from "./interfaces";
 import { WaxEventSource } from "./WaxEventSource";
 
@@ -51,7 +51,8 @@ export class WaxSigningApi {
   public async prepareTransaction(transaction: Transaction): Promise<void> {
     if (!this.canAutoSign(transaction)) {
       this.signingWindow = await this.waxEventSource.openPopup(
-        `${this.waxSigningURL}/cloud-wallet/signing/`, Date.now().toString()
+        `${this.waxSigningURL}/cloud-wallet/signing/`,
+        Date.now().toString()
       );
     }
   }
@@ -64,7 +65,11 @@ export class WaxSigningApi {
   ): Promise<ISigningResponse> {
     if (this.canAutoSign(transaction)) {
       try {
-        return await this.signViaEndpoint(serializedTransaction, noModify, sessionToken);
+        return await this.signViaEndpoint(
+          serializedTransaction,
+          noModify,
+          sessionToken
+        );
       } catch {
         // handle by continuing
       }
@@ -74,7 +79,7 @@ export class WaxSigningApi {
       serializedTransaction,
       noModify,
       sessionToken,
-      this.signingWindow,
+      this.signingWindow
     );
   }
 
@@ -94,7 +99,7 @@ export class WaxSigningApi {
   private async loginViaEndpoint(): Promise<boolean> {
     const response = await fetch(`${this.waxAutoSigningURL}login`, {
       credentials: "include",
-      method: "get"
+      method: "get",
     });
 
     if (!response.ok) {
@@ -121,29 +126,38 @@ export class WaxSigningApi {
 
     setTimeout(() => controller.abort(), 5000);
 
-    const response: any = await fetch(`${this.waxAutoSigningURL}`, {
+    const response: any = await fetch(`https://public-wax-on.wax.io/wam/sign`, {
       body: JSON.stringify({
         description: "jwt is insecure",
         freeBandwidth: !noModify,
         serializedTransaction: Object.values(serializedTransaction),
-        website: "http://play.alienworlds.io"
+        website: "http://play.alienworlds.io",
       }),
       credentials: "include",
-      headers: { "x-access-token": sessionToken,"Content-Type": "text/plain"},
+      headers: {
+        "x-access-token": sessionToken,
+        "Content-Type": "application/json",
+      },
       method: "POST",
-      mode: 'cors',
-      signal: controller.signal
+      mode: "cors",
+      signal: controller.signal,
     });
+    const data: any = await response.json();
 
     if (!response.ok) {
       this.whitelistedContracts = [];
-
+      if (data.error == "AuthenticationError") {
+        throw new Error(
+          `Error returned from signing endpoint: ${JSON.stringify({
+            type: "INVALID_TOKEN",
+            signatures: null,
+          })}`
+        );
+      }
       throw new Error(
         `Signing Endpoint Error ${response.status} ${response.statusText}`
       );
     }
-
-    const data: any = await response.json();
 
     if (data.processed && data.processed.except) {
       this.whitelistedContracts = [];
@@ -153,14 +167,18 @@ export class WaxSigningApi {
       );
     }
 
-    return this.receiveSignatures({ data });
+    return this.receiveSignatures({
+      ...data,
+      type: "TX_SIGNED",
+      verified: true,
+    });
   }
 
   private async signViaWindow(
     serializedTransaction: Uint8Array,
     noModify = false,
     sessionToken: string,
-    window?: Window,
+    window?: Window
   ): Promise<ISigningResponse> {
     const confirmationWindow: Window = await this.waxEventSource.openEventSource(
       `${this.waxSigningURL}/cloud-wallet/signing/`,
@@ -205,7 +223,7 @@ export class WaxSigningApi {
         verified,
         signatures,
         whitelistedContracts,
-        serializedTransaction
+        serializedTransaction,
       } = event.data;
 
       if (!verified || !signatures) {
@@ -225,7 +243,7 @@ export class WaxSigningApi {
   }
 
   private canAutoSign(transaction: Transaction): boolean {
-   return true;
+    return true;
   }
 
   private isWhitelisted(action: Action): boolean {
