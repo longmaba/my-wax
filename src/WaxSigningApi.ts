@@ -168,9 +168,11 @@ export class WaxSigningApi {
     }
 
     return this.receiveSignatures({
-      ...data,
-      type: "TX_SIGNED",
-      verified: true,
+      data: {
+        ...data,
+        type: "TX_SIGNED",
+        verified: true,
+      },
     });
   }
 

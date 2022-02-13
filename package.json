@@ -1,6 +1,6 @@
 {
   "name": "my-wax-long",
-  "version": "4.0.5",
+  "version": "5.0.1",
   "description": "Javascript API for integration with the WAX Cloud Wallet.",
   "scripts": {
     "build": "tsc",
